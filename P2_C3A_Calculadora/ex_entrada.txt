@@ -12,3 +12,20 @@ repeat n - 1 do
 	i := i + 1
 done
 fact
+
+//Operacions amb reals
+s := 6.5 - 3.1
+div := 10.4 / 4.0
+
+//Operacions amb tipus diferents
+m := 3 * 3.5
+d := 10 / 4.5
+
+//Potencia
+pot := 2 ** 2
+
+//Taules unidimensionals
+
+t := [10]
+t [2] := 4
+t [3] := 5

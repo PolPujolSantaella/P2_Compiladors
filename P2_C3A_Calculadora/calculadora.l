@@ -28,6 +28,9 @@ close_block_comment "*/"
 "("								{ return ABRIR_PAR; }
 ")"								{ return CERRAR_PAR; }
 
+"["								{ return ABRIR_COR; }
+"]"								{ return CERRAR_COR; }
+
 ":=" 							{ return ASSIGN; }
 "+" 							{ return SUMA; }
 "-" 							{ return RESTA; }
@@ -40,13 +43,23 @@ close_block_comment "*/"
 "do"							{ return DO; }
 "done"							{ return DONE; }
 
+"TABLE"							{ return TABLE; }
+
 
 {lletra}({lletra}|{digit})*						{ sym_value_type value;
-												yylval.id.lexema = (char *)malloc(sizeof(char)*(yyleng+1));
-												yylval.id.lexema[yyleng] = '\0';
-												strncpy(yylval.id.lexema, yytext, yyleng+1);
-												if (sym_lookup(yytext, &value) == SYMTAB_OK) return ID_ARITM; 
-												else return ID;
+													yylval.id.lexema = (char *)malloc(sizeof(char)*(yyleng+1));
+													yylval.id.lexema[yyleng] = '\0';
+													strncpy(yylval.id.lexema, yytext, yyleng+1);
+													if (sym_lookup(yytext, &value) == SYMTAB_OK){
+														switch (value.tipus) {
+															case ARRAY:
+																return ARRAY_ID;
+															default:
+																return ID_ARITM; 
+														}
+													} else {
+														return ID_ARITM;
+													}
 												}
 								
 {endline} 										{ return FI_SENT; }
@@ -58,16 +71,18 @@ close_block_comment "*/"
 <comment>{close_block_comment}{endline}? 		{BEGIN(INITIAL);} 
 
 "-"?{digit}({digit})*							{ yylval.cadena = (char *)malloc(sizeof(char)* yyleng+1);
-												strncpy(yylval.cadena, yytext, yyleng);
-												yylval.cadena[yyleng] = '\0';
-												return INTEGER;
+													strncpy(yylval.cadena, yytext, yyleng);
+													yylval.cadena[yyleng] = '\0';
+													
+													return INTEGER;
 												}
 								
 "-"?{digit}+"."{digit}+((?i:e)"-"?{digit}*)?	{ yylval.cadena = (char *)malloc(sizeof(char)*yyleng+1);
-												strncpy(yylval.cadena, yytext, yyleng);
-												yylval.cadena[yyleng] = '\0';
-												return FLOAT;
+													strncpy(yylval.cadena, yytext, yyleng);
+													yylval.cadena[yyleng] = '\0';
+													return FLOAT;
 												}
+												
 {space}+ 										{}
 
 . { fprintf(stderr, "Error lèxic en la línea %d: '%s' \n", yylineno, yytext); exit(1); }

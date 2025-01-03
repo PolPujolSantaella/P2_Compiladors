@@ -27,6 +27,8 @@ void freeSentencies();
 char* generate_temp();
 void genC3A_aritmetica(sym_value_type *s0, sym_value_type s1, sym_value_type s2, const char* operador);
 void genC3A_salt_cond(sym_value_type s1, const char *operador, sym_value_type s2, char *jump);
+void declare_array(char* arrayName, int elems);
+void assign_array(const char* arrayName, int index, sym_value_type r);
 
 
 %}
@@ -47,13 +49,15 @@ void genC3A_salt_cond(sym_value_type s1, const char *operador, sym_value_type s2
 	char *cadena;
 }
 
-%token <id> ID ID_ARITM 
+%token <id> ID ID_ARITM ARRAY_ID
 %token <cadena> INTEGER FLOAT
+%token TABLE DOUBLE ENTER
 %token ASSIGN SUMA RESTA MULT DIV MOD POT 
 %token REPEAT DO DONE
-%token FI_SENT ABRIR_PAR CERRAR_PAR
+%token FI_SENT ABRIR_PAR CERRAR_PAR ABRIR_COR CERRAR_COR
 
-%type <id> id
+%type <id> id 
+%type <id> array_exp array_declaration array_access array_assignment
 %type <expr> expresion expresion_aritmetica expre_prec1_arit expre_prec2_arit expre_base_arit
 %type <expr> ini_bucle
 
@@ -74,7 +78,8 @@ sentencia: simple | iterativa;
 simple: FI_SENT
 		| assignacio FI_SENT
 		| procediments FI_SENT
-;
+		| array_exp
+;					
 
 assignacio: id ASSIGN expresion {
 				$1.value = $3;
@@ -82,8 +87,62 @@ assignacio: id ASSIGN expresion {
 				gen_c3a(3, $1.lexema, ":=", $3.lloc);
 			}
 ;
-			
-id: ID | ID_ARITM;
+
+id: ID_ARITM ;
+
+array_exp: array_declaration
+		| array_assignment
+		| array_access
+		| ARRAY_ID FI_SENT {
+			if (sym_lookup($1.lexema, &$$.value) == SYMTAB_NOT_FOUND) {
+				yyerror("No s'ha trobat l'identificador");
+			} else {
+				$$.value.lloc = $1.lexema;
+			}
+			gen_c3a(2, "PARAM", $$.value.lloc);
+			char *aux = malloc(sizeof(int));
+			sprintf(aux, "%d", $$.value.mida);
+			gen_c3a(2, "CALL PUTI, ", aux);
+		}
+;
+
+array_declaration: id ASSIGN ABRIR_COR INTEGER CERRAR_COR FI_SENT {
+						declare_array($1.lexema, atoi($4));
+					}
+;
+
+array_assignment: ARRAY_ID ABRIR_COR INTEGER CERRAR_COR ASSIGN expresion FI_SENT {
+					assign_array($1.lexema, atoi($3), $6);
+				}
+				| ARRAY_ID ABRIR_COR ID_ARITM CERRAR_COR ASSIGN expresion FI_SENT {
+					sym_value_type index;
+					if (sym_lookup($3.lexema, &index) == SYMTAB_NOT_FOUND) {
+						yyerror("No s'ha trobat l'index");
+					} else if (index.tipus != ENTERO) {
+						yyerror("L'index ha de ser enter");
+					} else {
+						assign_array($1.lexema, atoi($3.value.lloc), $6);
+					}
+				}
+;
+
+array_access: ARRAY_ID ABRIR_COR INTEGER CERRAR_COR FI_SENT {
+				if(sym_lookup($1.lexema,&$$.value)==SYMTAB_NOT_FOUND) yyerror("Error sintactico: El identificador no existe");
+				else  $$.value.lloc = $1.lexema;
+				char* aux2 = malloc(sizeof(int));
+    			sprintf(aux2, "%d", atoi($3));
+				gen_c3a(2,"PARAM ", $1.lexema);
+				gen_c3a(2,"CALL PUTI, ", aux2);
+			}
+			| ARRAY_ID ABRIR_COR ID_ARITM CERRAR_COR FI_SENT {
+				if(sym_lookup($1.lexema,&$$.value)==SYMTAB_NOT_FOUND) yyerror("Error sintactico: El identificador no existe");
+				else  $$.value.lloc = $1.lexema;
+				char *aux2 = malloc(sizeof(int));
+    			sprintf(aux2, "%d", atoi($3.value.lloc));
+				gen_c3a(2,"PARAM ", $1.lexema);
+				gen_c3a(2,"CALL PUTI, ", $3.lexema);
+			}
+;
 
 expresion: expresion_aritmetica; 
 
@@ -179,7 +238,6 @@ put: ID_ARITM{
 	}
 ;
 
-
 %%
 
 void printSentencies(){
@@ -188,6 +246,35 @@ void printSentencies(){
 	}
 	fprintf(yyout, "%d: HALT\n", line_comp);
 }
+
+void declare_array(char* arrayName, int elems){
+	sym_value_type array;
+	array.tipus = ARRAY;
+	int mida = sizeof(int);
+	int total = elems * mida;
+	array.mida = elems;
+	sym_enter(arrayName, &array);
+	char sizeStr[20];
+	sprintf(sizeStr, "%d", total);
+	gen_c3a(4, arrayName, ":=", "ALLOC ", sizeStr);
+}
+
+
+void assign_array(const char* arrayName, int index, sym_value_type r){
+	sym_value_type array_info;
+	if (sym_lookup(arrayName, &array_info) == SYMTAB_OK && array_info.tipus == ARRAY) {
+		int offset = sizeof(r.tipus) * index;
+		char *aux = malloc(sizeof(r.tipus)*index);
+		sprintf(aux, "%d", offset);
+		char *tempOffset = generate_temp();
+		gen_c3a(5, tempOffset, ":=", "index ", "MULI ", aux);
+		gen_c3a(5, arrayName, "[", tempOffset, "] := ", r.lloc);
+	} else {
+		yyerror("Identificador no trobat");
+	}
+}
+		
+
 
 void gen_c3a(int args_count, ...){
 	va_list args;

@@ -17,12 +17,18 @@
 /* The type of the value field of symbol table entries                      */
 typedef enum {
 	ENTERO,
-	REAL
+	REAL, 
+	ARRAY
 } ValueType;
 
 typedef struct{
 	ValueType tipus;
 	char *lloc;
+	int valor;
+	int mida;
+	void *array;
+	int integer;
+	float real;
 } sym_value_type;
 
           /* you will need to replace this    */
